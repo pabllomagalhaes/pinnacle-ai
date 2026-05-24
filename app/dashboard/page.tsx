@@ -5,6 +5,8 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { Trash2, CheckCircle2, Circle, Clock, Calendar, Video } from "lucide-react";
+// NOVA IMPORTAÇÃO: O nosso componente de formulário com Toasts
+import { ActionForm } from "@/components/ActionForm";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -21,7 +23,6 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Lendo o token diretamente do cookie persistido
   const providerToken = cookieStore.get("google_provider_token")?.value;
   let calendarEvents = [];
   let calendarError = false;
@@ -51,7 +52,6 @@ export default async function DashboardPage() {
     calendarError = true;
   }
 
-  // BUSCA DE DADOS INTERNOS (Supabase)
   const { data: tasks } = await supabase
     .from("tasks")
     .select("*")
@@ -63,7 +63,6 @@ export default async function DashboardPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  // CÁLCULOS DAS MÉTRICAS INTERNAS
   const totalMinutes = sessions?.reduce((acc, curr) => acc + curr.duration_minutes, 0) || 0;
   const totalHours = (totalMinutes / 60).toFixed(1);
   const completedTasksCount = tasks?.filter(task => task.is_completed).length || 0;
@@ -81,14 +80,12 @@ export default async function DashboardPage() {
       },
     });
     
-    // Remove o cookie do token do Google
     cookieStore.set({ name: 'google_provider_token', value: '', maxAge: 0 });
-    
     await supabase.auth.signOut();
     redirect("/login");
   }
 
- async function handleAddTask(formData: FormData) {
+  async function handleAddTask(formData: FormData) {
     "use server";
     const title = formData.get("title") as string;
     if (!title) return;
@@ -98,7 +95,6 @@ export default async function DashboardPage() {
       cookies: { get(name: string) { return cookieStore.get(name)?.value; }, set() {}, remove() {} }
     });
 
-    // CORREÇÃO DE SEGURANÇA: Usando getUser() em vez de getSession()
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       await supabase.from("tasks").insert({ title, user_id: user.id });
@@ -143,7 +139,6 @@ export default async function DashboardPage() {
       cookies: { get(name: string) { return cookieStore.get(name)?.value; }, set() {}, remove() {} }
     });
 
-    // CORREÇÃO DE SEGURANÇA: Usando getUser() em vez de getSession()
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       await supabase.from("focus_sessions").insert({ duration_minutes: duration, user_id: user.id });
@@ -175,21 +170,23 @@ export default async function DashboardPage() {
           <Card>
             <CardHeader><CardTitle>Nova Meta / Tarefa</CardTitle></CardHeader>
             <CardContent>
-              <form action={handleAddTask} className="space-y-4">
+              {/* SUBSTITUÍDO: form por ActionForm */}
+              <ActionForm action={handleAddTask} successMessage="Nova meta adicionada!" resetOnSuccess className="space-y-4">
                 <input type="text" name="title" placeholder="Ex: Refatorar estrutura do banco de dados" className="w-full p-2 border rounded-md bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
                 <Button type="submit" className="w-full">Adicionar Meta</Button>
-              </form>
+              </ActionForm>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader><CardTitle>Registo de Sessão de Foco</CardTitle></CardHeader>
             <CardContent>
-              <form action={handleAddFocusSession} className="grid grid-cols-3 gap-3">
+              {/* SUBSTITUÍDO: form por ActionForm */}
+              <ActionForm action={handleAddFocusSession} successMessage="Sessão de foco registrada com sucesso!" className="grid grid-cols-3 gap-3">
                 <Button type="submit" name="duration" value="25" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 25m</Button>
                 <Button type="submit" name="duration" value="50" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 50m</Button>
                 <Button type="submit" name="duration" value="90" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 90m</Button>
-              </form>
+              </ActionForm>
             </CardContent>
           </Card>
         </div>
@@ -202,19 +199,21 @@ export default async function DashboardPage() {
                 tasks.map((task) => (
                   <li key={task.id} className={`flex items-center justify-between p-3 border rounded-lg shadow-sm transition-all ${task.is_completed ? "bg-muted/50" : "bg-card"}`}>
                     <div className="flex items-center space-x-3">
-                      <form action={handleToggleTask}>
+                      {/* SUBSTITUÍDO: form por ActionForm */}
+                      <ActionForm action={handleToggleTask} successMessage={task.is_completed ? "Meta reaberta!" : "Meta concluída!"}>
                         <input type="hidden" name="id" value={task.id} />
                         <input type="hidden" name="is_completed" value={task.is_completed.toString()} />
                         <button type="submit" className="mt-1 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors">
                           {task.is_completed ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Circle className="h-5 w-5" />}
                         </button>
-                      </form>
+                      </ActionForm>
                       <span className={`text-sm ${task.is_completed ? "line-through text-muted-foreground" : ""}`}>{task.title}</span>
                     </div>
-                    <form action={handleDeleteTask}>
+                    {/* SUBSTITUÍDO: form por ActionForm */}
+                    <ActionForm action={handleDeleteTask} successMessage="Meta apagada!">
                       <input type="hidden" name="id" value={task.id} />
                       <Button variant="ghost" size="icon" type="submit" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                    </form>
+                    </ActionForm>
                   </li>
                 ))
               ) : (
