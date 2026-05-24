@@ -1,16 +1,9 @@
-//import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr'
 
-//const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-//const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-//export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("ERRO: As chaves do Supabase não foram encontradas no .env.local");
-}
-
-export const supabase = createClient(supabaseUrl!, supabaseAnonKey!);
+// Ao usar o createBrowserClient do @supabase/ssr, 
+// ele automaticamente configura o fluxo PKCE (seguro para servidores)
+// e salva os cookies corretamente no formato Next.js 15+
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
