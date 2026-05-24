@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { Trash2, CheckCircle2, Circle, Clock, Calendar, Video } from "lucide-react";
-// NOVA IMPORTAÇÃO: O nosso componente de formulário com Toasts
+import { Trash2, CheckCircle2, Circle, Clock, Calendar, Video, Target } from "lucide-react";
 import { ActionForm } from "@/components/ActionForm";
+// NOVA IMPORTAÇÃO
+import { FocusChart } from "@/components/FocusChart";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -63,9 +64,40 @@ export default async function DashboardPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  const totalMinutes = sessions?.reduce((acc, curr) => acc + curr.duration_minutes, 0) || 0;
-  const totalHours = (totalMinutes / 60).toFixed(1);
+  // ---------------------------------------------------------
+  // LÓGICA DE AGREGAÇÃO DE DADOS PARA O GRÁFICO (ÚLTIMOS 7 DIAS)
+  // ---------------------------------------------------------
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    return d;
+  }).reverse(); // Ordena do dia mais antigo para o de hoje
+
+  const formattedChartData = last7Days.map(date => {
+    // Pega o nome do dia da semana curto (ex: seg, ter, qua)
+    const dayName = date.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
+    
+    // Filtra as sessões que aconteceram especificamente nesta data
+    const daySessions = sessions?.filter(session => {
+      const sessionDate = new Date(session.created_at);
+      return sessionDate.toDateString() === date.toDateString();
+    }) || [];
+
+    // Soma os minutos e converte para horas decimais (ex: 90 min = 1.5h)
+    const totalMins = daySessions.reduce((acc, curr) => acc + curr.duration_minutes, 0);
+    const totalHours = parseFloat((totalMins / 60).toFixed(1));
+
+    return {
+      name: dayName.charAt(0).toUpperCase() + dayName.slice(1),
+      hours: totalHours
+    };
+  });
+
+  // Métricas gerais consolidadas
+  const totalMinutesAllTime = sessions?.reduce((acc, curr) => acc + curr.duration_minutes, 0) || 0;
+  const totalHoursAllTime = (totalMinutesAllTime / 60).toFixed(1);
   const completedTasksCount = tasks?.filter(task => task.is_completed).length || 0;
+  // ---------------------------------------------------------
 
   // --- SERVER ACTIONS ---
 
@@ -158,30 +190,47 @@ export default async function DashboardPage() {
         </form>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Horas de Foco</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold">{totalHours}h</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Metas Cumpridas</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold">{completedTasksCount}</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Total de Tarefas</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold">{tasks?.length || 0}</div></CardContent></Card>
+      {/* GRID DE MÉTRICAS ATUALIZADO: O primeiro card agora ocupa duas colunas para o gráfico */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex justify-between items-center">
+              <span>Rendimento Semanal (Foco)</span>
+              <span className="text-foreground font-bold text-base">Total: {totalHoursAllTime}h</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* INJEÇÃO DO COMPONENTE DO GRÁFICO */}
+            <FocusChart data={formattedChartData} />
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Metas Cumpridas</CardTitle></CardHeader>
+          <CardContent><div className="text-4xl font-bold mt-4">{completedTasksCount}</div></CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Total de Tarefas</CardTitle></CardHeader>
+          <CardContent><div className="text-4xl font-bold mt-4">{tasks?.length || 0}</div></CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-12">
-        
         <div className="space-y-8">
           <Card>
             <CardHeader><CardTitle>Nova Meta / Tarefa</CardTitle></CardHeader>
             <CardContent>
-              {/* SUBSTITUÍDO: form por ActionForm */}
               <ActionForm action={handleAddTask} successMessage="Nova meta adicionada!" resetOnSuccess className="space-y-4">
-                <input type="text" name="title" placeholder="Ex: Refatorar estrutura do banco de dados" className="w-full p-2 border rounded-md bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
+                <input type="text" name="title" placeholder="Ex: Estudar Matemática" className="w-full p-2 border rounded-md bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-ring" required />
                 <Button type="submit" className="w-full">Adicionar Meta</Button>
               </ActionForm>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Registo de Sessão de Foco</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Registro de Sessão de Foco</CardTitle></CardHeader>
             <CardContent>
-              {/* SUBSTITUÍDO: form por ActionForm */}
               <ActionForm action={handleAddFocusSession} successMessage="Sessão de foco registrada com sucesso!" className="grid grid-cols-3 gap-3">
                 <Button type="submit" name="duration" value="25" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 25m</Button>
                 <Button type="submit" name="duration" value="50" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 50m</Button>
@@ -199,7 +248,6 @@ export default async function DashboardPage() {
                 tasks.map((task) => (
                   <li key={task.id} className={`flex items-center justify-between p-3 border rounded-lg shadow-sm transition-all ${task.is_completed ? "bg-muted/50" : "bg-card"}`}>
                     <div className="flex items-center space-x-3">
-                      {/* SUBSTITUÍDO: form por ActionForm */}
                       <ActionForm action={handleToggleTask} successMessage={task.is_completed ? "Meta reaberta!" : "Meta concluída!"}>
                         <input type="hidden" name="id" value={task.id} />
                         <input type="hidden" name="is_completed" value={task.is_completed.toString()} />
@@ -209,7 +257,6 @@ export default async function DashboardPage() {
                       </ActionForm>
                       <span className={`text-sm ${task.is_completed ? "line-through text-muted-foreground" : ""}`}>{task.title}</span>
                     </div>
-                    {/* SUBSTITUÍDO: form por ActionForm */}
                     <ActionForm action={handleDeleteTask} successMessage="Meta apagada!">
                       <input type="hidden" name="id" value={task.id} />
                       <Button variant="ghost" size="icon" type="submit" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
