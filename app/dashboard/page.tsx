@@ -8,6 +8,7 @@ import { Trash2, CheckCircle2, Circle, Clock, Calendar, Video, CalendarPlus } fr
 import { ActionForm } from "@/components/ActionForm";
 import { FocusChart } from "@/components/FocusChart";
 import { Badge } from "@/components/ui/badge";
+import { AIModal } from "@/components/AIModal";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -320,13 +321,21 @@ export default async function DashboardPage() {
                         </button>
                       </ActionForm>
                       <div className="flex flex-col gap-1 w-full">
-                        <span className={`text-sm ${task.is_completed ? "line-through text-muted-foreground" : ""}`}>{task.title}</span>
-                        {task.category && (
-                          <Badge variant="outline" className={`w-fit text-[10px] px-1.5 py-0 font-normal ${task.is_completed ? "opacity-50" : ""} ${getCategoryColor(task.category)}`}>
-                            {task.category}
-                          </Badge>
-                        )}
-                      </div>
+  <div className="flex items-center gap-2">
+    <span className={`text-sm ${task.is_completed ? "line-through text-muted-foreground" : ""}`}>
+      {task.title}
+    </span>
+    {/* 2. INJEÇÃO DO ASSISTENTE DE IA AO LADO DO TÍTULO */}
+    {!task.is_completed && (
+      <AIModal taskTitle={task.title} taskCategory={task.category} />
+    )}
+  </div>
+  {task.category && (
+    <Badge variant="outline" className={`w-fit text-[10px] px-1.5 py-0 font-normal ${task.is_completed ? "opacity-50" : ""} ${getCategoryColor(task.category)}`}>
+      {task.category}
+    </Badge>
+  )}
+</div>
                     </div>
                     <ActionForm action={handleDeleteTask} successMessage="Matéria removida!">
                       <input type="hidden" name="id" value={task.id} />

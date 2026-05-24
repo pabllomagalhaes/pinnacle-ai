@@ -70,3 +70,23 @@ Agora que a engenharia de infraestrutura básica terminou, entramos na fase de m
     Modelagem do Banco de Dados (Supabase): Criar tabelas para salvar o histórico de cada sessão de estudo realizada (tempo gasto, matéria estudada, data e nível de satisfação/rendimento).
 
     Painel de Analytics: Consumir os dados salvos no Supabase e transformá-los em gráficos visuais (horas estudadas por semana, evolução da produtividade e taxas de conclusão de metas).
+
+    Dito isto, aqui está o nosso "Radar de APIs" que você pode manter em mente para as próximas sprints, mas que recomendo deixarmos desativadas por enquanto:
+
+1. Google People API
+
+    Para que serve: Lê o perfil público completo do utilizador.
+
+    Onde usaríamos: Para substituir aquele "Bem-vindo, email@gmail.com" no topo da sua Dashboard pelo seu Nome real e puxar a sua foto de perfil do Google para criar um Avatar redondo bem profissional no canto da tela.
+
+2. Gmail API
+
+    Para que serve: Permite ler, enviar e modificar e-mails.
+
+    Onde usaríamos: Uma funcionalidade premium onde o utilizador pode "Transformar um e-mail numa Tarefa", ou para o próprio PinnacleAI enviar-lhe um e-mail automático às segundas-feiras de manhã com o resumo de quantas horas de foco você teve na semana anterior.
+
+3. Google Drive API
+
+    Para que serve: Acesso aos ficheiros da nuvem.
+
+    Onde usaríamos: Se no futuro você quiser adicionar a funcionalidade de anexar documentos (como PDFs ou planilhas de requisitos) diretamente às suas Metas no painel.
