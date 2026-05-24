@@ -5,11 +5,16 @@ import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
   const handleGoogleLogin = async () => {
-    // Usamos o cliente supabase diretamente aqui
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${location.origin}/auth/callback`, 
+        redirectTo: `${location.origin}/auth/callback`,
+        scopes: "https://www.googleapis.com/auth/calendar.readonly",
+        // NOVA CONFIGURAÇÃO: Força o Google a enviar o token em todos os logins
+        queryParams: {
+          prompt: 'consent',
+          access_type: 'offline',
+        },
       },
     });
   };

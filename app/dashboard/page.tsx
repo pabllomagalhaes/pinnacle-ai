@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { Trash2, CheckCircle2, Circle, Clock } from "lucide-react";
+import { Trash2, CheckCircle2, Circle, Clock, Calendar, Video } from "lucide-react";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -12,9 +12,7 @@ export default async function DashboardPage() {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: { get(name: string) { return cookieStore.get(name)?.value; } }
-    }
+    { cookies: { get(name: string) { return cookieStore.get(name)?.value; } } }
   );
   
   const { data: { user } } = await supabase.auth.getUser();
@@ -23,7 +21,37 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // 1. BUSCA DE DADOS (Tasks e Sessions)
+  // Lendo o token diretamente do cookie persistido
+  const providerToken = cookieStore.get("google_provider_token")?.value;
+  let calendarEvents = [];
+  let calendarError = false;
+
+  if (providerToken) {
+    try {
+      const now = new Date().toISOString();
+      const googleResponse = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${now}&maxResults=5&singleEvents=true&orderBy=startTime`,
+        {
+          headers: { Authorization: `Bearer ${providerToken}` },
+          next: { revalidate: 60 }
+        }
+      );
+
+      if (googleResponse.ok) {
+        const calendarData = await googleResponse.json();
+        calendarEvents = calendarData.items || [];
+      } else {
+        calendarError = true;
+      }
+    } catch (err) {
+      console.error(err);
+      calendarError = true;
+    }
+  } else {
+    calendarError = true;
+  }
+
+  // BUSCA DE DADOS INTERNOS (Supabase)
   const { data: tasks } = await supabase
     .from("tasks")
     .select("*")
@@ -35,7 +63,7 @@ export default async function DashboardPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  // CÁLCULOS DAS MÉTRICAS
+  // CÁLCULOS DAS MÉTRICAS INTERNAS
   const totalMinutes = sessions?.reduce((acc, curr) => acc + curr.duration_minutes, 0) || 0;
   const totalHours = (totalMinutes / 60).toFixed(1);
   const completedTasksCount = tasks?.filter(task => task.is_completed).length || 0;
@@ -52,11 +80,15 @@ export default async function DashboardPage() {
         remove(name: string, options) { cookieStore.set({ name, value: '', ...options }); },
       },
     });
+    
+    // Remove o cookie do token do Google
+    cookieStore.set({ name: 'google_provider_token', value: '', maxAge: 0 });
+    
     await supabase.auth.signOut();
     redirect("/login");
   }
 
-  async function handleAddTask(formData: FormData) {
+ async function handleAddTask(formData: FormData) {
     "use server";
     const title = formData.get("title") as string;
     if (!title) return;
@@ -66,6 +98,7 @@ export default async function DashboardPage() {
       cookies: { get(name: string) { return cookieStore.get(name)?.value; }, set() {}, remove() {} }
     });
 
+    // CORREÇÃO DE SEGURANÇA: Usando getUser() em vez de getSession()
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       await supabase.from("tasks").insert({ title, user_id: user.id });
@@ -100,7 +133,6 @@ export default async function DashboardPage() {
     revalidatePath("/dashboard");
   }
 
-  // NOVA AÇÃO: Grava a sessão de foco no banco de dados
   async function handleAddFocusSession(formData: FormData) {
     "use server";
     const duration = parseInt(formData.get("duration") as string, 10);
@@ -111,19 +143,16 @@ export default async function DashboardPage() {
       cookies: { get(name: string) { return cookieStore.get(name)?.value; }, set() {}, remove() {} }
     });
 
+    // CORREÇÃO DE SEGURANÇA: Usando getUser() em vez de getSession()
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      await supabase.from("focus_sessions").insert({
-        duration_minutes: duration,
-        user_id: user.id
-      });
+      await supabase.from("focus_sessions").insert({ duration_minutes: duration, user_id: user.id });
       revalidatePath("/dashboard");
     }
   }
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      {/* Cabeçalho */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Painel de Performance</h1>
@@ -134,17 +163,14 @@ export default async function DashboardPage() {
         </form>
       </div>
 
-      {/* Grid de Métricas Dinâmicas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card><CardHeader><CardTitle className="text-sm font-medium">Horas de Foco</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold">{totalHours}h</div></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm font-medium">Metas Cumpridas</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold">{completedTasksCount}</div></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm font-medium">Total de Tarefas</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold">{tasks?.length || 0}</div></CardContent></Card>
       </div>
 
-      {/* Bloco de Ações Interativas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-12">
         
-        {/* Coluna da Esquerda: Formulários de Entrada (Tarefas e Foco) */}
         <div className="space-y-8">
           <Card>
             <CardHeader><CardTitle>Nova Meta / Tarefa</CardTitle></CardHeader>
@@ -156,29 +182,18 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* NOVO FORMULÁRIO: Lançador de Sessões de Foco */}
           <Card>
             <CardHeader><CardTitle>Registo de Sessão de Foco</CardTitle></CardHeader>
             <CardContent>
               <form action={handleAddFocusSession} className="grid grid-cols-3 gap-3">
-                <Button type="submit" name="duration" value="25" variant="secondary" className="flex items-center justify-center gap-2">
-                  <Clock className="h-4 w-4" /> 25 min
-                </Button>
-                <Button type="submit" name="duration" value="50" variant="secondary" className="flex items-center justify-center gap-2">
-                  <Clock className="h-4 w-4" /> 50 min
-                </Button>
-                <Button type="submit" name="duration" value="90" variant="secondary" className="flex items-center justify-center gap-2">
-                  <Clock className="h-4 w-4" /> 90 min
-                </Button>
+                <Button type="submit" name="duration" value="25" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 25m</Button>
+                <Button type="submit" name="duration" value="50" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 50m</Button>
+                <Button type="submit" name="duration" value="90" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 90m</Button>
               </form>
-              <p className="text-xs text-muted-foreground mt-3 text-center">
-                Selecione um bloco para simular o encerramento de um ciclo Pomodoro.
-              </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Coluna da Direita: Listagem das Metas Atuais */}
         <Card>
           <CardHeader><CardTitle>Minhas Metas Atuais</CardTitle></CardHeader>
           <CardContent>
@@ -194,20 +209,53 @@ export default async function DashboardPage() {
                           {task.is_completed ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Circle className="h-5 w-5" />}
                         </button>
                       </form>
-                      <span className={`text-sm ${task.is_completed ? "line-through text-muted-foreground" : ""}`}>
-                        {task.title}
-                      </span>
+                      <span className={`text-sm ${task.is_completed ? "line-through text-muted-foreground" : ""}`}>{task.title}</span>
                     </div>
                     <form action={handleDeleteTask}>
                       <input type="hidden" name="id" value={task.id} />
-                      <Button variant="ghost" size="icon" type="submit" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <Button variant="ghost" size="icon" type="submit" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
                     </form>
                   </li>
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground italic">Nenhuma meta cadastrada ainda.</p>
+              )}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle>Agenda do Dia</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4 mt-2">
+              {calendarError ? (
+                <p className="text-sm text-amber-600 italic">Sessão expirada. Faça logout e login novamente para reautorizar a agenda.</p>
+              ) : calendarEvents.length > 0 ? (
+                calendarEvents.map((event: any) => {
+                  const startTime = event.start?.dateTime 
+                    ? new Date(event.start.dateTime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+                    : "Dia todo";
+                  
+                  return (
+                    <li key={event.id} className="p-3 border rounded-lg bg-muted/30 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-sm font-medium line-clamp-2">{event.summary}</span>
+                        <span className="text-xs bg-secondary px-2 py-0.5 rounded text-secondary-foreground shrink-0">{startTime}</span>
+                      </div>
+                      
+                      {event.hangoutLink && (
+                        <a href={event.hangoutLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-xs text-primary hover:underline pt-1">
+                          <Video className="h-3.5 w-3.5" /> Entrar no Meet
+                        </a>
+                      )}
+                    </li>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground italic">Nenhum compromisso agendado para as próximas horas.</p>
               )}
             </ul>
           </CardContent>
