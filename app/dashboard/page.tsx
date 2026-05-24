@@ -9,6 +9,7 @@ import { ActionForm } from "@/components/ActionForm";
 import { FocusChart } from "@/components/FocusChart";
 import { Badge } from "@/components/ui/badge";
 import { AIModal } from "@/components/AIModal";
+import { PomodoroTimer } from "@/components/PomodoroTimer";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -231,15 +232,13 @@ export default async function DashboardPage() {
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="max-w-7xl mx-auto space-y-8">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Painel de Performance</h1>
           <p className="text-muted-foreground mt-2">Bem-vindo, {user.email}.</p>
         </div>
-        <form action={handleSignOut}>
-          <Button variant="outline">Sair</Button>
-        </form>
+       
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
@@ -292,14 +291,12 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Registo de Sessão de Foco</CardTitle></CardHeader>
+          <Card className="border-primary/20 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-center">Modo Foco</CardTitle>
+            </CardHeader>
             <CardContent>
-              <ActionForm action={handleAddFocusSession} successMessage="Sessão de foco registrada com sucesso!" className="grid grid-cols-3 gap-3">
-                <Button type="submit" name="duration" value="25" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 25m</Button>
-                <Button type="submit" name="duration" value="50" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 50m</Button>
-                <Button type="submit" name="duration" value="90" variant="secondary" className="flex items-center justify-center gap-2"><Clock className="h-4 w-4" /> 90m</Button>
-              </ActionForm>
+              <PomodoroTimer addSessionAction={handleAddFocusSession} />
             </CardContent>
           </Card>
         </div>
